@@ -1,0 +1,137 @@
+﻿<h3>UserDemoes</h3>
+
+@page "/userdemoes"
+@inject HttpClient Http
+@using DemoApiApp.Model
+@*** comment 
+	@using BlazorDatabase.Shared
+	@using BlazorDatabase.Client.Components 
+*@
+@using System.Reflection
+@rendermode InteractiveServer
+
+<form onsubmit="return false;">
+	<div class="input-group input-group-md mb-2">
+		<span class="input-group-text">Search by Name</span>
+		<input type="text" class="form-control" @bind-value="filter" />
+		<button class="btn btn-primary" @onclick="Search">Search</button>
+	</div>
+</form>
+
+@if (custs == null)
+{
+	<p><em>Loading...</em></p>
+}
+
+<div class="table-responsive">
+	<table class="table table-hover table-striped">
+		<thead>
+			<tr><th>User Name</th><th>Email</th><th colspan="2">Date Of Birth</th></tr>
+		</thead>
+		<tbody>
+			@if ((custs != null) && (custs.Count == 0))
+			{
+				<div class="test">
+					<span class="">Search not found @filter.</span>
+				</div>
+			}
+			<DataRepeaterComponent Items="custs">
+				<Row Context="cust">
+					<tr>
+						<td>
+							<input type="text" class="form-control" value="@cust.UserName" @onchange="@((ChangeEventArgs e) => Save(e, cust, "UserName"))" />
+						</td>
+						<td>
+							<input type="text" class="form-control" value="@cust.EmailAddress" @onchange="@((ChangeEventArgs e) => Save(e, cust, "EmailAddress"))" />
+						</td>
+						<td>
+							<input type="text" class="form-control" value="@cust.DateOfBirth" @onchange="@((ChangeEventArgs e) => Save(e, cust, "DateOfBirth"))" />
+						</td>
+						<td>
+							<button class="btn btn-sm btn-danger" @onclick="@(() => Delete(cust.Id))">delete</button>
+						</td>
+					</tr>
+				</Row>
+			</DataRepeaterComponent>
+		</tbody>
+	</table>
+</div>
+
+<form class="mt-5" onsubmit="return false;">
+	<div class="input-group input-group-md mb-2">
+		<span class="input-group-text">Name</span>
+		<input type="text" class="form-control" autocomplete="off" required @bind-value="newcust.UserName" />
+	</div>
+	<div class="input-group input-group-md mb-2">
+		<span class="input-group-text">Email</span>
+		<input type="text" class="form-control" autocomplete="off" required @bind-value="newcust.EmailAddress" />
+	</div>
+	<div class="input-group input-group-md mb-2">
+		<span class="input-group-text">Date of Birth</span>
+		<input type="text" class="form-control" autocomplete="off" 
+			required @bind-value="newcust.DateOfBirth" />
+		
+		<button class="btn btn-success" @onclick="Add">Add</button>
+	</div>
+</form>
+
+@code {
+
+	private List<UserDemo> custs;
+	private UserDemo newcust = new UserDemo();
+	private string filter;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+
+		custs = await Http.GetFromJsonAsync<List<UserDemo>>("http://localhost:4000/api/user");
+	}
+
+	private async Task Search()
+	{
+		custs = await Http.GetFromJsonAsync<List<UserDemo>>($"http://localhost:4000/api/user/named?filter={Uri.EscapeDataString(filter)}");
+
+	}
+
+	private async Task Add()
+	{
+		using (var msg = await Http.PostAsJsonAsync<UserDemo>("http://localhost:4000/api/user", newcust, System.Threading.CancellationToken.None))
+		{
+			if (msg.IsSuccessStatusCode)
+			{
+				//custs.Add(await msg.Content.ReadFromJsonAsync<UserDemo>());
+				custs = await Http.GetFromJsonAsync<List<UserDemo>>("http://localhost:4000/api/user");
+				newcust.UserName =  newcust.EmailAddress = string.Empty;
+			}
+		}
+	}
+
+	private async Task Save(ChangeEventArgs e, UserDemo cust, string propField)
+	{
+		PropertyInfo pinfo = typeof(UserDemo).GetProperty(propField);
+		pinfo.SetValue(cust, e.Value);
+
+		using (var msg = await Http.PutAsJsonAsync<UserDemo>($"http://localhost:4000/api/user/", cust, System.Threading.CancellationToken.None))
+		{
+			if (msg.IsSuccessStatusCode)
+			{
+			}
+			else
+			{
+				// DO SOMETHING
+			}
+		}
+	}
+
+	private async Task Delete(int id)
+	{
+		using (var msg = await Http.DeleteAsync($"http://localhost:4000/api/user/{id}"))
+		{
+			if (msg.IsSuccessStatusCode)
+			{
+				custs = await Http.GetFromJsonAsync<List<UserDemo>>("http://localhost:4000/api/user");
+			}
+		}
+	}
+}
